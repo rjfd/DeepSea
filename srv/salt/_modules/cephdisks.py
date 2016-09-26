@@ -3,9 +3,10 @@
 import os
 import re
 import xml.etree.ElementTree as et
-from glob import glob
-from subprocess import Popen, PIPE
 import logging
+import math
+from glob import glob
+from subprocess import Popen, PIPE, check_output, STDOUT
 
 log = logging.getLogger(__name__)
 
@@ -401,6 +402,35 @@ class HardwareDetections(object):
             if rf not in hardware_dict or not hardware_dict[rf]:
                 raise ValueError("{} is not included in the hardware dict.".format(rf))
 
+    @staticmethod
+    def _check_is_mounted(device):
+        for line in check_output(['mount', '-l']).split('\n'):
+            match = re.match('^{}\d+ on (.+) type.*'.format(device), line)
+            if match:
+                return match.group(1)
+        return None
+
+    @staticmethod
+    def _measure_disk_throughput(out_path, remove_output):
+        script = 'sync; time sh -c "dd if=/dev/zero of={} bs=4K count=100000 ' \
+                 '&& sync"'.format(out_path)
+        pr = Popen('/bin/bash', stderr=STDOUT, stdin=PIPE, stdout=PIPE)
+        out, err = pr.communicate(script)
+
+        throughput = -1
+        match_size = re.match(r'^(\d+) bytes.*', out.split('\n')[2])
+        match_time = re.match(r'^real\s+(\d)+m(\d+\.\d+)s.*',
+                              out.split('\n')[4])
+        if match_size and match_time:
+            size = int(match_size.group(1))
+            time = int(match_time.group(1)) * 60 + float(match_time.group(2))
+            throughput = size / time
+
+        if remove_output:
+            os.remove(out_path)
+
+        return int(math.ceil(throughput))
+
     def assemble_device_list(self):
         """
         Find all unpartitioned and allocated osds.  Return unified dict.
@@ -423,8 +453,7 @@ class HardwareDetections(object):
             # Skip partitioned, non-osd drives
             partitions = glob(base + "/" + device + "*")
             if partitions:
-                for p in partitions:
-                    ids = [re.sub('\D+', '', p) for p in partitions]
+                ids = [re.sub('\D+', '', p) for p in partitions]
                 if not self._osd("/dev/" + device, ids):
                     continue
 
@@ -444,6 +473,17 @@ class HardwareDetections(object):
             else:
                 hardware['rotational'] = self._is_rotational(base)
 
+            # measure throughput
+            test_out_path = HardwareDetections._check_is_mounted('/dev/{}'.format(device))
+            block = False
+            if not test_out_path:
+                block = True
+                test_out_path = '/dev/{}'.format(device)
+            else:
+                test_out_path = '{}/test.bin'.format(test_out_path)
+            throughput = HardwareDetections._measure_disk_throughput(test_out_path, not block)
+            hardware['throughput'] = throughput
+
             hardware['device'] = device
             self._preflight_check(hardware)
             drives.append(hardware)
@@ -454,9 +494,14 @@ def list_(**kwargs):
     hwd = HardwareDetections(**kwargs)
     return hwd.assemble_device_list()
 
+
 def version():
     print VERSION
+
 
 __func_alias__ = {
                 'list_': 'list',
                 }
+
+
+
