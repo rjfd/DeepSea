@@ -7,6 +7,7 @@ import pprint
 import logging
 import imp
 import re
+import shutil
 
 """
 This runner is the complement to the populate.proposals.
@@ -93,6 +94,8 @@ class PillarData(object):
         /srv/pillar/ceph/cluster and /srv/pillar/ceph/stack/default.
         """
 
+        self._clean()
+
         for pathname in common.keys():
             merged = self._merge(pathname, common)
             filename = self.pillar_dir + "/" + pathname
@@ -111,6 +114,14 @@ class PillarData(object):
                 default_path = re.sub(r'stack/default', "stack", pathname)
                 custom = self.pillar_dir + "/" + default_path
                 self._custom(custom)
+
+    def _clean(self):
+        """
+        Remove the stack/default tree to remove any leftover files from a
+        previous removal
+        """
+        shutil.rmtree(self.pillar_dir + '/stack/default')
+
 
     def _default(self, filename, merged):
         """
