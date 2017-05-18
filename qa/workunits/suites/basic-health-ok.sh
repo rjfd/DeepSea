@@ -4,35 +4,25 @@
 #
 # This integration test script makes the following assumptions:
 # 1. there are four machines that are running the same OS (e.g. Leap 42.3) and
-#    can see eachother over the network:
-#    - Salt Master/admin node
-#    - mon.a
-#    - mon.b
-#    - mon.c
-# 2. Salt Master/admin node need have no external drives
-# 3. nodes mon.{a,b,c} need at least one external drive (>= 20GB) for OSD
-# 4. the integration test script is running on Salt Master/admin node
-# 5. the Salt Master/admin node has:
-#    - salt-master package installed
-#    - salt-master.service enabled and started
-# 6. the mon.{a,b,c} nodes have:
-#    - salt-minion package installed
-#    - salt-minion.service enabled and started
-# 7. the Salt Master/admin node has accepted all the minion keys and test.ping
-#    has succeeded against all three nodes mon.{a,b,c}
-# 8. the ceph RPMs under test have already been installed on nodes mon.{a,b,c}
-# 9. the DeepSea code under test has already been installed on Salt
+#    can see eachother over the network. 
+# 2. all four machines are configured as a Salt cluster, i.e. one is configured
+#    as both a master and a minion, and the rest are configured as minions only
+#    and the master can "salt '*' test.ping" all the minions
+# 3. at least three of the machines need to have at least one external drive
+#    (>= 20GB) for OSD
+# 4. the integration test script (this script) is run on Salt Master/admin node
+# 5. the ceph RPMs under test have already been installed on all the nodes
+# 6. the DeepSea code under test has already been installed on Salt
 #    Master/admin node
 #
-# This script deploys a Ceph cluster on nodes mon.{a,b,c} and checks for
-# HEALTH_OK.
+# This script deploys a Ceph cluster on all the nodes that have at least one
+# external disk drive and checks for HEALTH_OK.
 #
-# On success (HEALTH_OK is reached), the script returns 0.
+# On success (HEALTH_OK is reached), the script returns 0. On failure, for
+# whatever reason, the script returns non-zero.
 #
-# On failure, for whatever reason, the script returns non-zero.
-#
-# The script produces verbose output on stdout for capture and later forensic
-# analysis.
+# The script produces verbose output on stdout, which can be captured for later
+# forensic analysis.
 
 SALT_MASTER=`cat /srv/pillar/ceph/master_minion.sls | \
              sed 's/.*master_minion:[[:blank:]]*\(\w\+\)[[:blank:]]*/\1/' | \
