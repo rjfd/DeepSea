@@ -428,7 +428,7 @@ class StepListPrinter(MonitorListener):
                     PP.println(" ({})"
                                .format(StepListPrinter.Step.ftime(ts-self.start_ts)))
             else:
-                ts = datetime.datetime.now()
+                ts = datetime.datetime.utcnow()
                 PP.print(StepListPrinter.WAITING)
                 PP.println(" ({})".format(StepListPrinter.Step.ftime(ts-self.start_ts)))
 
@@ -523,7 +523,7 @@ class StepListPrinter(MonitorListener):
                     PP.println(" ({})"
                                .format(StepListPrinter.Step.ftime(ts-self.start_ts)))
                 else:
-                    ts = datetime.datetime.now()
+                    ts = datetime.datetime.utcnow()
                     PP.print(StepListPrinter.WAITING)
                     PP.println(" ({})"
                                .format(StepListPrinter.Step.ftime(ts-self.start_ts)))
