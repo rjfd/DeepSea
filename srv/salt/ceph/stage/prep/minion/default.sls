@@ -83,7 +83,7 @@ finished {{ host }}:
 
 {% endfor %}
 
-unset noout after final iteration: 
+unset noout after final iteration:
   salt.state:
     - sls: ceph.noout.unset
     - tgt: {{ salt['pillar.get']('master_minion') }}
@@ -136,5 +136,6 @@ restart:
     - tgt: '{{ salt['pillar.get']('deepsea_minions') }}'
     - tgt_type: compound
     - sls: ceph.updates.restart
+    - failhard: True
 
 {% endif %}

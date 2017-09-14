@@ -11,7 +11,7 @@ class PackageManager(object):
     """
     That is not the native salt module and is not meant to
     replace it.
-    This module was created to react on the host package 
+    This module was created to react on the host package
     manager's reboot advice, rebooting if required.
     """
 
@@ -36,6 +36,9 @@ class PackageManager(object):
         Assuming `shutdown -r` works on all platforms
         """
         log.info("The PackageManager asked for a system reboot. Rebooting in 1 Minute")
+        __salt__['event.send']('deepsea/packagemanager/reboot', {
+            'reason': "DeepSea installed some updates that require the system to be rebooted"
+        })
         if self.debug or not self.reboot:
             log.debug("Faking Reboot")
             return None

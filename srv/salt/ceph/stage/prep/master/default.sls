@@ -53,6 +53,7 @@ restart master:
   salt.state:
     - tgt: {{ salt['pillar.get']('master_minion') }}
     - sls: ceph.updates.restart
+    - failhard: True
 
 complete marker:
   salt.runner:

@@ -7,9 +7,8 @@ configure_mines:
     - fire_event: True
 
 manage_salt_minion_for_mines:
-  service.running:
-    - name: salt-minion
+  module.run:
+    - name: mine.update
     - watch:
       - file: configure_mines
     - fire_event: True
-
