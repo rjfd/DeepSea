@@ -425,6 +425,22 @@ class MonitorListener(object):
         """
         pass
 
+    def deepsea_event(self, event):
+        """
+        This function is called when a DeepSea module sends an event
+        Args:
+            step (salt_event.DeepSeaEvent): the event object
+        """
+        pass
+
+    def monitor_stop(self, interrupt):
+        """
+        This function is called when the monitor is stopping
+        Args:
+            interrupt (bool): flag to indicate if monitor stop is due to an interrupt
+        """
+        pass
+
 
 class Monitor(threading.Thread):
     """
@@ -486,6 +502,10 @@ class Monitor(threading.Thread):
             logger.debug("buffer: %s", event)
             self.monitor.append_event(Monitor.Event(self.monitor, 'state_result_step', event))
 
+        def handle_deepsea_event(self, event):
+            logger.debug("buffer: %s", event)
+            self.monitor.append_event(Monitor.Event(self.monitor, 'deepsea_event', event))
+
     def __init__(self, show_state_steps, show_dynamic_steps):
         super(Monitor, self).__init__()
         self._processor = SaltEventProcessor()
@@ -498,6 +518,7 @@ class Monitor(threading.Thread):
         self._event_cond = threading.Condition(self._event_lock)
         self._event_buffer = []
         self._running = False
+        self._interrupt = False
         self._stage_steps = {}
 
     def parse_stage(self, stage_name):
@@ -525,11 +546,31 @@ class Monitor(threading.Thread):
         Stop the monitoring thread
         """
         logger.info("Stopping the DeepSea event monitoring")
+
         self._running = False
         self._processor.stop()
 
+        self._fire_event('monitor_stop', self._interrupt)
+
         if wait:
             self.wait_to_finish()
+
+    def interrupt(self, force=False):
+        """
+        Triggers a monitor stop, but lets current step to finish in case force == False,
+        otherwise, stops the monitor immediately.
+        """
+        if force:
+            self.stop()
+        else:
+            logger.debug("interrupt called")
+            self._interrupt = True
+
+    def is_interrupting(self):
+        """
+        Checks whether the monitor is in an interrumption process
+        """
+        return self._interrupt
 
     def wait_to_finish(self):
         """
@@ -540,7 +581,7 @@ class Monitor(threading.Thread):
 
     def is_running(self):
         """
-        Checks wheather the Salt event process is still runnning
+        Checks whether the Salt event process is still runnning
         """
         return self._processor.is_running() and self._running
 
@@ -654,6 +695,8 @@ class Monitor(threading.Thread):
         """
         if not self._running_stage:
             # not inside a running stage, igore step
+            if self._interrupt:
+                self.stop()
             return
         step = self._running_stage.finish_step(event)
         if not step:
@@ -674,6 +717,9 @@ class Monitor(threading.Thread):
             if not event.success:
                 logger.info("State step error:\n%s", PP.format_dict(event.raw_event))
             self._fire_event('step_runner_finished', step)
+
+        if step.finished and self._interrupt:
+            self.stop()
 
         skipped = self._running_stage.check_if_current_step_will_run()
         while skipped:
@@ -698,3 +744,9 @@ class Monitor(threading.Thread):
             return
         logger.info("State Result: %s: %s result=%s", event.state_id, event.name, event.result)
         self._fire_event('step_state_result', step, event)
+
+    def deepsea_event(self, event):
+        if not self._running_stage:
+            # not inside a running stage, igore event
+            return
+        self._fire_event('deepsea_event', event)

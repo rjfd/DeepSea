@@ -207,6 +207,11 @@ class SimplePrinter(MonitorListener):
         else:
             PP.println("fail")
 
+    def monitor_stop(self, interrupt):
+        if interrupt:
+            PP.println()
+            PP.println("Stage was interrupted")
+
     @staticmethod
     def format_runner_event(event):
         if event.fun.startswith('runner.'):
@@ -694,8 +699,11 @@ class StepListPrinter(MonitorListener):
                     else:
                         PP.println(PP.orange("{}:".format(step)))
                     traceback = error.raw_event['data']['return']
-                    for line in traceback.split('\n'):
-                        PP.println(PP.red("  {}".format(line)))
+                    if isinstance(traceback, str):
+                        for line in traceback.split('\n'):
+                            PP.println(PP.red("  {}".format(line)))
+                    else:
+                        PP.println(PP.red("  {}".format(traceback)))
 
                     logger.debug("runner error:\n%s", error.raw_event)
 
@@ -781,6 +789,14 @@ class StepListPrinter(MonitorListener):
             assert self.step
             assert isinstance(self.step, StepListPrinter.State)
             self.print_step(self.step)
+
+    def monitor_stop(self, interrupt):
+        if self.thread:
+            self.thread.stop()
+        if interrupt:
+            PP.println()
+            PP.print(PP.bold("Interrupted stage: "))
+            PP.println(SP.STAGE(self.stage.name))
 
 
 SP = StepListPrinter

@@ -24,7 +24,10 @@ class SaltEvent(object):
     def __init__(self, raw_event):
         self.raw_event = raw_event
         self.tag = raw_event['tag']
-        self.jid = raw_event['data']['jid']
+        if 'jid' in raw_event['data']:
+            self.jid = raw_event['data']['jid']
+        else:
+            self.jid = None
         self.stamp = raw_event['data']['_stamp']
         if 'fun' in raw_event['data']:
             self.fun = raw_event['data']['fun']
@@ -118,6 +121,20 @@ class StateResultEvent(SaltEvent):
                .format(self.state_id, self.name, self.minion, self.result)
 
 
+class DeepSeaEvent(SaltEvent):
+    """
+    DeepSea Event
+    This kind of event represent events sent by DeepSea modules
+    """
+    def __init__(self, raw_event):
+        super(DeepSeaEvent, self).__init__(raw_event)
+        self.minion = raw_event['data']['id']
+        self.reason = self.raw_event['data']['data']['reason']
+
+    def __str__(self):
+        return "DeepSea(tag: {} minion: {} reason: {})".format(self.tag, self.minion, self.reason)
+
+
 class EventListener(object):
     """
     This class represents a listener object that listens to particular Salt events.
@@ -162,6 +179,13 @@ class EventListener(object):
         """Handle state result event
         Args:
             event (StateResultEvent): the state result event
+        """
+        pass
+
+    def handle_deepsea_event(self, event):
+        """Handle deepsea event
+        Args:
+            event (DeepSeaEvent): the deepsea event
         """
         pass
 
@@ -255,3 +279,8 @@ class SaltEventProcessor(threading.Thread):
             for listener in self.listeners:
                 listener.handle_salt_event(wrapper)
                 listener.handle_state_result_event(wrapper)
+        elif fnmatch.fnmatch(event['tag'], 'deepsea/*'):
+            wrapper = DeepSeaEvent(event)
+            for listener in self.listeners:
+                listener.handle_salt_event(wrapper)
+                listener.handle_deepsea_event(wrapper)
