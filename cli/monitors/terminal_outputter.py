@@ -34,6 +34,11 @@ class SimplePrinter(MonitorListener):
         PP.print("Parsing stage {} steps... ".format(stage_name))
 
     def stage_parsing_finished(self, stage, output):
+        if not stage:
+            PP.println("fail")
+            PP.println()
+            return
+
         PP.println("done")
         PP.println()
         PP.println("Stage initialization output:")
@@ -581,6 +586,7 @@ class StepListPrinter(MonitorListener):
     def __init__(self, clear_screen=True):
         super(StepListPrinter, self).__init__()
         self._clear_screen = clear_screen
+        self.stage_name = None
         self.stage = None
         self.total_steps = None
         self.errors = None
@@ -596,6 +602,7 @@ class StepListPrinter(MonitorListener):
         PP.p_bold("Starting stage: ")
         PP.println(SP.STAGE(stage_name))
 
+        self.stage_name = stage_name
         self.errors = OrderedDict()
         self.stage = None
         self.total_steps = None
@@ -606,7 +613,11 @@ class StepListPrinter(MonitorListener):
 
     def stage_parsing_finished(self, stage, output):
         PP.print("\x1B[A\x1B[K")
-        PP.print(SP.INFO("Parsing {} steps... ".format(stage.name)))
+        PP.print(SP.INFO("Parsing {} steps... ".format(self.stage_name)))
+        if not stage:
+            PP.println(SP.FAIL)
+            PP.println()
+            return
         PP.println(SP.OK)
         PP.println()
         self.init_output = output.strip()

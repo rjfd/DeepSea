@@ -14,7 +14,8 @@ from .common import PrettyPrinter as PP
 from .salt_event import SaltEventProcessor
 from .salt_event import EventListener
 from .salt_event import NewJobEvent, NewRunnerEvent, RetJobEvent, RetRunnerEvent
-from .stage_parser import SLSParser, SaltRunner, SaltState, SaltModule, SaltBuiltIn
+from .stage_parser import SLSParser, SaltRunner, SaltState, SaltModule, SaltBuiltIn, \
+                          StateRenderingException, RenderingException
 
 
 # pylint: disable=C0111
@@ -524,8 +525,12 @@ class Monitor(threading.Thread):
     def parse_stage(self, stage_name):
         self._fire_event('stage_started', stage_name)
         self._fire_event('stage_parsing_started', stage_name)
-        parsed_steps, out = SLSParser.parse_state_steps(stage_name, not self._show_state_steps,
-                                                        True, False)
+        try:
+            parsed_steps, out = SLSParser.parse_state_steps(stage_name, not self._show_state_steps,
+                                                            True, False)
+        except RenderingException as ex:
+            self._fire_event('stage_parsing_finished', None, None)
+            raise ex
         self._stage_steps[stage_name] = (parsed_steps, out)
 
     def append_event(self, event):
@@ -621,9 +626,26 @@ class Monitor(threading.Thread):
         else:
             self._fire_event('stage_started', stage_name)
             self._fire_event('stage_parsing_started', stage_name)
-            parsed_steps, out = SLSParser.parse_state_steps(stage_name,
-                                                            not self._show_state_steps,
-                                                            True, False)
+            try:
+                parsed_steps, out = SLSParser.parse_state_steps(stage_name,
+                                                                not self._show_state_steps,
+                                                                True, False)
+            except RenderingException as ex:
+                # pylint: disable=E1101
+                self._fire_event('stage_parsing_finished', None, None)
+                if isinstance(ex, StateRenderingException):
+                    PP.println(PP.bold("An error occurred when rendering one of the following "
+                                       "states:"))
+                    for state in ex.states:
+                        PP.print(PP.cyan("    - {}".format(state)))
+                        PP.println(" ({})".format("/srv/salt/{}".format(state.replace(".", "/"))))
+                else:
+                    PP.println(PP.bold("An error occurred while rendering the stage file:"))
+                    PP.println(PP.cyan("    {}".format(ex.stage_file)))
+                PP.println()
+                PP.println(PP.bold("Error description:"))
+                PP.println(PP.red(ex.pretty_error_desc_str()))
+                return
         self._running_stage = Stage(stage_name, parsed_steps, self._show_dynamic_steps)
 
         self._fire_event('stage_parsing_finished', self._running_stage, out)

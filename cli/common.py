@@ -47,6 +47,7 @@ class PrettyPrinter(object):
     Helper class to pretty print
     """
 
+    NO_FORMAT = False
     _PP = pprint.PrettyPrinter(indent=1)
 
     class Colors(object):
@@ -76,7 +77,10 @@ class PrettyPrinter(object):
         """
         Generic pretty print string formatter
         """
-        return u"{}{}{}".format(color, text, PrettyPrinter.Colors.ENDC)
+        if PrettyPrinter.NO_FORMAT:
+            return text
+        else:
+            return u"{}{}{}".format(color, text, PrettyPrinter.Colors.ENDC)
 
     @staticmethod
     def header(text):
