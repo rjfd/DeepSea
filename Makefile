@@ -33,6 +33,7 @@ copy-files:
 	install -d -m 755 $(DESTDIR)$(DOCDIR)/deepsea
 	install -m 644 LICENSE $(DESTDIR)$(DOCDIR)/deepsea/
 	install -m 644 README.md $(DESTDIR)$(DOCDIR)/deepsea/
+	install -m 644 version.txt $(DESTDIR)$(DOCDIR)/deepsea/
 	# examples
 	install -d -m 755 $(DESTDIR)$(DOCDIR)/deepsea/examples
 	install -m 644 doc/examples/* $(DESTDIR)$(DOCDIR)/deepsea/examples/
@@ -568,6 +569,7 @@ copy-files:
 	-chown salt:salt $(DESTDIR)/srv/salt/ceph/configuration/files/ceph.conf.checksum || true
 
 install: copy-files
+	chmod 755 $(DOCDIR)/deepsea/version.txt
 	sed -i '/^sharedsecret: /s!{{ shared_secret }}!'`cat /proc/sys/kernel/random/uuid`'!' $(DESTDIR)/etc/salt/master.d/sharedsecret.conf
 	chown salt:salt $(DESTDIR)/etc/salt/master.d/*
 	echo "deepsea_minions: '*'" > /srv/pillar/ceph/deepsea_minions.sls
@@ -585,8 +587,18 @@ rpm: tarball test
 
 # Removing test dependency until resolved
 tarball:
-	VERSION=`awk '/^Version/ {print $$2}' deepsea.spec`; \
-	git archive --prefix deepsea-$$VERSION/ -o ~/rpmbuild/SOURCES/deepsea-$$VERSION.tar.bz2 HEAD
+	mkdir -p .tmp
+	git archive --prefix deepsea-tmp/ -o .tmp/deepsea-tmp.tar HEAD
+	HASH=`git rev-parse --short HEAD`; \
+	OFFSET=`git rev-list \`git log --pretty=oneline -- version.txt | head -1 | cut -d ' ' -f 1\`..HEAD | wc -l`; \
+	cd .tmp; tar -xf deepsea-tmp.tar; cd deepsea-tmp; \
+	VERSION=`cat version.txt`; F_VERSION="$$VERSION+git.$$OFFSET.$$HASH"; \
+	echo $$F_VERSION > version.txt; \
+	cat deepsea.spec.in | sed -e "s/@VERSION@/$$F_VERSION/g" > deepsea.spec; \
+	cd ..; mv deepsea-tmp deepsea-$$F_VERSION; \
+	tar -cjf deepsea-$$F_VERSION.tar.bz2 deepsea-$$F_VERSION; \
+	rm -r deepsea-$$F_VERSION; rm deepsea-tmp.tar; \
+	mv deepsea-$$F_VERSION.tar.bz2 ..; cd ..; rm -r .tmp
 
 test:
 	tox -e py27

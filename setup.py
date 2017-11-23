@@ -5,14 +5,10 @@ from setuptools import setup
 
 def _get_deepsea_version():
     try:
-        with open('deepsea.spec', 'r') as f:
-            for line in f:
-                if line.startswith("Version:"):
-                    match = re.match('^Version:(.*)', line)
-                    if match:
-                        return match.group(1).strip()
+        with open('version.txt', 'r') as f:
+            return f.read()
     except IOError:
-        return "(dev-version)"
+        return "(unknown-version)"
 
 setup(
     name='deepsea',
