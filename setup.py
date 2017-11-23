@@ -1,22 +1,19 @@
 # -*- coding: utf-8 -*-
-import re
+from __future__ import absolute_import
+
+import sys
 from setuptools import setup
 
 
-def _get_deepsea_version():
-    try:
-        with open('deepsea.spec', 'r') as f:
-            for line in f:
-                if line.startswith("Version:"):
-                    match = re.match('^Version:(.*)', line)
-                    if match:
-                        return match.group(1).strip()
-    except IOError:
-        return "(dev-version)"
+if '--set-version' in sys.argv:
+    idx = sys.argv.index('--set-version')
+    sys.argv.pop(idx)
+    version = sys.argv.pop(idx)
+
 
 setup(
     name='deepsea',
-    version=_get_deepsea_version(),
+    version='@VERSION@' if not version else version,
     package_dir={
         'deepsea': 'cli'
     },
