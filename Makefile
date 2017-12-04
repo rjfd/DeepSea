@@ -1,3 +1,19 @@
+IN_GIT=$(shell [ -d .git ] || git rev-parse --git-dir > /dev/null 2>&1 && echo true)
+ifeq ($(IN_GIT),true)
+VERSION=$(shell git describe HEAD | sed -e 's/^\([0-9\.]\+\)-\([0-9]\+\)-g\(\w\+\)/\1+git.\2.\3/')
+ifeq ($(findstring git,$(VERSION)), )
+VERSION:=$(VERSION)+git.0.$(shell git rev-parse --short $(VERSION))
+endif
+else
+HAS_VERSION_FILE=$(shell [ -e version.txt ] && echo true)
+ifeq ($(HAS_VERSION_FILE),true)
+VERSION=$(shell cat version.txt)
+else
+VERSION=unknown-version
+endif
+endif
+
+
 # Override this to install docs somewhere else
 DOCDIR = /usr/share/doc/packages
 
@@ -33,7 +49,6 @@ copy-files:
 	install -d -m 755 $(DESTDIR)$(DOCDIR)/deepsea
 	install -m 644 LICENSE $(DESTDIR)$(DOCDIR)/deepsea/
 	install -m 644 README.md $(DESTDIR)$(DOCDIR)/deepsea/
-	install -m 644 version.txt $(DESTDIR)$(DOCDIR)/deepsea/
 	# examples
 	install -d -m 755 $(DESTDIR)$(DOCDIR)/deepsea/examples
 	install -m 644 doc/examples/* $(DESTDIR)$(DOCDIR)/deepsea/examples/
@@ -587,18 +602,16 @@ rpm: tarball test
 
 # Removing test dependency until resolved
 tarball:
-	mkdir -p .tmp
-	git archive --prefix deepsea-tmp/ -o .tmp/deepsea-tmp.tar HEAD
-	HASH=`git rev-parse --short HEAD`; \
-	OFFSET=`git rev-list \`git log --pretty=oneline -- version.txt | head -1 | cut -d ' ' -f 1\`..HEAD | wc -l`; \
-	cd .tmp; tar -xf deepsea-tmp.tar; cd deepsea-tmp; \
-	VERSION=`cat version.txt`; F_VERSION="$$VERSION+git.$$OFFSET.$$HASH"; \
-	echo $$F_VERSION > version.txt; \
-	cat deepsea.spec.in | sed -e "s/@VERSION@/$$F_VERSION/g" > deepsea.spec; \
-	cd ..; mv deepsea-tmp deepsea-$$F_VERSION; \
-	tar -cjf deepsea-$$F_VERSION.tar.bz2 deepsea-$$F_VERSION; \
-	rm -r deepsea-$$F_VERSION; rm deepsea-tmp.tar; \
-	mv deepsea-$$F_VERSION.tar.bz2 ..; cd ..; rm -r .tmp
+	$(eval TEMPDIR := $(shell mktemp -d))
+	$(eval DS_DIR := $(TEMPDIR)/deepsea-$(VERSION))
+	mkdir $(DS_DIR)
+	git archive HEAD | tar -x -C $(DS_DIR)
+	cat $(DS_DIR)/deepsea.spec.in | sed -e "s/@VERSION@/$(VERSION)/g" > $(DS_DIR)/deepsea.spec
+	echo "$(VERSION)" > $(DS_DIR)/version.txt
+	sed -i "s/@VERSION@/$(VERSION)/" $(DS_DIR)/setup.py
+	sed -i "s/@VERSION@/$(VERSION)/" $(DS_DIR)/srv/modules/runners/deepsea.py
+	tar -cjf deepsea-$(VERSION).tar.bz2 -C $(TEMPDIR) deepsea-$(VERSION)
+	rm -r $(TEMPDIR)
 
 test:
 	tox -e py27
